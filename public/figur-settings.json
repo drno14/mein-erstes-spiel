@@ -1,0 +1,191 @@
+{
+  "version": 2,
+  "profiles": {
+    "gehen": {
+      "version": 1,
+      "symmetric": true,
+      "values": {
+        "handTwist": {
+          "l": 22,
+          "r": 22
+        },
+        "wristBend": {
+          "l": -8,
+          "r": -8
+        },
+        "elbowBend": {
+          "l": 30,
+          "r": 30
+        },
+        "elbowOut": {
+          "l": 1,
+          "r": 1
+        },
+        "armForward": {
+          "l": 0,
+          "r": 0
+        },
+        "shoulderUp": {
+          "l": 0,
+          "r": 0
+        },
+        "legTwist": {
+          "l": 2,
+          "r": 2
+        },
+        "legForward": {
+          "l": 2,
+          "r": 2
+        },
+        "legSpread": {
+          "l": 1,
+          "r": 1
+        },
+        "kneeBend": {
+          "l": 8,
+          "r": 8
+        },
+        "footOut": {
+          "l": 24,
+          "r": 24
+        },
+        "footPitch": {
+          "l": 5,
+          "r": 5
+        },
+        "footRoll": {
+          "l": -15,
+          "r": -15
+        },
+        "lean": 4,
+        "bodyTurn": 0,
+        "headNod": -11,
+        "headTurn": 0
+      }
+    },
+    "sprint": {
+      "version": 1,
+      "symmetric": true,
+      "values": {
+        "handTwist": {
+          "l": -32,
+          "r": -32
+        },
+        "wristBend": {
+          "l": 0,
+          "r": 0
+        },
+        "elbowBend": {
+          "l": 10,
+          "r": 10
+        },
+        "elbowOut": {
+          "l": 1,
+          "r": 1
+        },
+        "armForward": {
+          "l": 20,
+          "r": 20
+        },
+        "shoulderUp": {
+          "l": 0,
+          "r": 0
+        },
+        "legTwist": {
+          "l": 2,
+          "r": 2
+        },
+        "legForward": {
+          "l": 5,
+          "r": 5
+        },
+        "legSpread": {
+          "l": 1,
+          "r": 1
+        },
+        "kneeBend": {
+          "l": 8,
+          "r": 8
+        },
+        "footOut": {
+          "l": 24,
+          "r": 24
+        },
+        "footPitch": {
+          "l": 5,
+          "r": 5
+        },
+        "footRoll": {
+          "l": -15,
+          "r": -15
+        },
+        "lean": 4,
+        "bodyTurn": 0,
+        "headNod": -11,
+        "headTurn": 0
+      }
+    },
+    "springen": {
+      "version": 1,
+      "symmetric": true,
+      "values": {
+        "handTwist": {
+          "l": 22,
+          "r": 22
+        },
+        "wristBend": {
+          "l": -8,
+          "r": -8
+        },
+        "elbowBend": {
+          "l": 30,
+          "r": 30
+        },
+        "elbowOut": {
+          "l": 1,
+          "r": 1
+        },
+        "armForward": {
+          "l": 0,
+          "r": 0
+        },
+        "shoulderUp": {
+          "l": -8,
+          "r": -8
+        },
+        "legTwist": {
+          "l": 2,
+          "r": 2
+        },
+        "legForward": {
+          "l": 2,
+          "r": 2
+        },
+        "legSpread": {
+          "l": 1,
+          "r": 1
+        },
+        "kneeBend": {
+          "l": 8,
+          "r": 8
+        },
+        "footOut": {
+          "l": 24,
+          "r": 24
+        },
+        "footPitch": {
+          "l": 5,
+          "r": 5
+        },
+        "footRoll": {
+          "l": -15,
+          "r": -15
+        },
+        "lean": 4,
+        "bodyTurn": 0,
+        "headNod": -11,
+        "headTurn": 0
+      }
+    }
+  }
+}

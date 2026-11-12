@@ -1,0 +1,11 @@
+Alle Modelle in diesem Ordner sind CC0 (Public Domain), frei nutzbar ohne Namensnennung.
+- tiere/      Quaternius – "Farm Animals", "Animals Pack", "Animal Pack Vol.2" (opengameart.org)
+- fahrzeuge/  Kenney – Car Kit 3.1 (kenney.nl)
+- boote/      Kenney – Watercraft Kit (kenney.nl)
+- survival/   Kenney – Survival Kit (kenney.nl)
+- stadt/      Kenney – Fantasy Town Kit 2.0 (kenney.nl)
+- figur.glb   MakeHuman/MPFB System Assets (CC0); Bewegungen: CMU Graphics Lab Motion Capture Database (mocap.cs.cmu.edu)
+- items/essen/     Kenney – Food Kit (kenney.nl), dazu Quaternius – Fantasy Props MEGAKIT
+- items/waffen/    Quaternius – Ultimate RPG Items Pack, Fantasy Props MEGAKIT
+- items/werkzeuge/ Quaternius – Fantasy Props MEGAKIT
+- items/schaetze/  Quaternius – Ultimate RPG Items Pack, Fantasy Props MEGAKIT

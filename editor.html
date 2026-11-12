@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Bewegungs-Editor</title>
+  <link rel="stylesheet" href="/src/editor.css">
+</head>
+<body>
+  <main id="view">
+    <div id="toolbar">
+      <div class="seg" id="anims"></div>
+      <button id="play" title="Abspielen / Pause (Leertaste)">⏸</button>
+      <label class="inline">Tempo <input id="speed" type="range" min="0.1" max="2" step="0.05" value="1"><span id="speedVal">1.0×</span></label>
+      <input id="time" type="range" min="0" max="1" step="0.001" value="0" title="Zeit in der Animation">
+    </div>
+    <div id="cams" class="seg">
+      <button data-cam="front">Vorne</button><button data-cam="side">Seite</button>
+      <button data-cam="back">Hinten</button><button data-cam="three">Schräg</button>
+      <button data-cam="hands">Hände</button><button data-cam="feet">Füsse</button>
+      <button id="skel" class="toggle">Skelett</button>
+    </div>
+    <div id="status">Lade Figur …</div>
+  </main>
+
+  <aside id="panel">
+    <header>
+      <h1>Bewegungs-Editor</h1>
+      <p>Regler ziehen → Figur ändert sich sofort, auch im offenen Spiel. Mit <b>Speichern</b> wird es dauerhaft übernommen.</p>
+      <div class="profile-label">Einstellungen für:</div>
+      <div id="profiles" class="seg profiles"></div>
+      <label class="check"><input id="sym" type="checkbox" checked> Links und rechts gleich</label>
+    </header>
+    <div id="controls"></div>
+    <footer>
+      <div id="dirty">Alles gespeichert</div>
+      <div class="buttons">
+        <button id="reset0" class="ghost" title="Alle Regler auf 0">Alles auf 0</button>
+        <button id="revert" class="ghost" title="Ungespeicherte Änderungen verwerfen">Verwerfen</button>
+        <button id="save" class="primary">Speichern</button>
+      </div>
+    </footer>
+  </aside>
+
+  <script type="module" src="/src/editor.js"></script>
+</body>
+</html>

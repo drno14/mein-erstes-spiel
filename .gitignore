@@ -1,0 +1,8 @@
+node_modules/
+dist/
+.DS_Store
+# lokale Arbeitsdateien (nicht veröffentlichen)
+blender/
+animationen/
+.claude/
+*.blend1

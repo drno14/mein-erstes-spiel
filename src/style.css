@@ -1,0 +1,34 @@
+html, body { margin: 0; height: 100%; overflow: hidden; background: #87ceeb; font-family: system-ui, sans-serif; }
+canvas { display: block; }
+#hud {
+  position: fixed; top: 12px; left: 12px; padding: 8px 12px;
+  background: rgba(0, 0, 0, .45); color: #fff; border-radius: 8px; font-size: 14px; line-height: 1.5;
+  pointer-events: none;
+}
+#backend, #info { opacity: .8; font-size: 12px; }
+
+/* Hinweis unten (Einsteigen / Fahren) */
+#prompt {
+  position: fixed; left: 50%; bottom: 28px; transform: translateX(-50%); display: none;
+  padding: 8px 16px; border-radius: 10px; background: rgba(0, 0, 0, .55); color: #fff;
+  font-size: 14px; pointer-events: none; white-space: nowrap;
+}
+
+/* NPC-Namen und Sprechblasen */
+#labels { position: fixed; inset: 0; pointer-events: none; overflow: hidden; }
+.npc-label {
+  position: absolute; left: 0; top: 0; display: none; white-space: nowrap;
+  padding: 3px 9px; border-radius: 10px; background: rgba(0, 0, 0, .45);
+  color: #fff; font-size: 13px; text-align: center; will-change: transform;
+}
+.npc-label span:empty { display: none; }
+.npc-label.talking {
+  background: #fff; color: #222; box-shadow: 0 2px 8px rgba(0, 0, 0, .25);
+  max-width: 240px; white-space: normal;
+}
+.npc-label.talking b { display: block; font-size: 11px; color: #0f5c6b; }
+.npc-label.talking::after {
+  content: ''; position: absolute; left: 50%; bottom: -6px; margin-left: -6px;
+  border: 6px solid transparent; border-bottom: 0; border-top-color: #fff;
+}
+#backend.warn { color: #ffcc80; opacity: 1; }
