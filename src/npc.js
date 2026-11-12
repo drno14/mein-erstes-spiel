@@ -29,6 +29,12 @@ const LINES = [
   'Mit der Leertaste kommst du über jeden Zaun!',
   'Na, auch auf Wanderschaft?',
   'Mein Haus ist das mit dem roten Dach.',
+  'Der Bus ist schon wieder zu spät.',
+  'Hast du das neue Café am Platz schon probiert?',
+  'Mein Handy-Akku ist fast leer …',
+  'Die Windräder auf dem Hügel drehen heute schnell.',
+  'Ich muss noch schnell einkaufen gehen.',
+  'Pass auf die Autos auf, wenn du über die Strasse gehst!',
 ];
 // Das Modell hat echte Texturen (MPFB/MakeHuman) → Farben werden mit der Textur multipliziert.
 // Weiss = Original, dunklere/farbige Werte tönen ab.

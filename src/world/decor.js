@@ -84,6 +84,23 @@ const MODELS = {
   'mill-wheel': ['stadt/watermill', { h: 4.0, center: true }],   // nur das Wasserrad
   'mill-rotor': ['stadt/windmill', { h: 8.0, center: true }],    // nur die Flügel
   wheel: ['stadt/wheel', { h: 1.3 }],
+  // ---- modern (Kenney City Kits, CC0) ----
+  streetlight: ['modern/roads/light-curved', { h: 5.6, keepXZ: true }],
+  'traffic-light': ['modern/roads/traffic-light', { h: 4.3, keepXZ: true }],
+  'street-sign': ['modern/roads/road-sign-street', { h: 3.0, keepXZ: true }],
+  'stop-sign': ['modern/roads/road-sign-stop', { h: 2.6, keepXZ: true }],
+  dumpster: ['modern/roads/dumpster', { h: 1.5 }],
+  cone: ['modern/roads/construction-cone', { h: 0.7 }],
+  barrier: ['modern/roads/construction-barrier', { h: 1.0 }],
+  planter: ['modern/suburban/planter', { w: 2.2 }],
+  parasol: ['modern/commercial/detail-parasol-a', { h: 2.6 }],
+  'parasol-b': ['modern/commercial/detail-parasol-b', { h: 2.6 }],
+  'car-sedan': ['fahrzeuge/sedan', { l: 4.6 }],
+  'car-suv': ['fahrzeuge/suv', { l: 4.8 }],
+  'car-hatch': ['fahrzeuge/hatchback-sports', { l: 4.3 }],
+  'car-taxi': ['fahrzeuge/taxi', { l: 4.6 }],
+  'car-van': ['fahrzeuge/van', { l: 5.0 }],
+  'car-police': ['fahrzeuge/police', { l: 4.7 }],
   'boat-row-small': ['boote/boat-row-small', { l: 3.2 }],
   'boat-row-large': ['boote/boat-row-large', { l: 4.2 }],
   'boat-sail-a': ['boote/boat-sail-a', { l: 6.0 }],
@@ -204,6 +221,7 @@ export class DecorManager {
     const size = box.getSize(new THREE.Vector3());
     const s = spec.h ? spec.h / size.y : spec.w ? spec.w / size.x : spec.l / size.z;
     const c = box.getCenter(new THREE.Vector3());
+    if (spec.keepXZ) { c.x = 0; c.z = 0; }   // Ursprung (z. B. Mastfuss) behalten
     const ty = spec.center ? -c.y * s : spec.keepY ? 0 : -box.min.y * s;
     const norm = new THREE.Matrix4().makeTranslation(-c.x * s, ty, -c.z * s).multiply(new THREE.Matrix4().makeScale(s, s, s));
     for (const part of parts) part.local.premultiply(norm);
@@ -245,6 +263,19 @@ export class DecorManager {
       [geo(new THREE.BoxGeometry(1.0, 0.9, 0.9).translate(2.0, 6.4, 0)), dark],             // Nabe
       [geo(new THREE.BoxGeometry(0.15, 1.8, 1.0).translate(-2.25, 0.9, 0)), dark],           // Tür
       [geo(new THREE.BoxGeometry(0.12, 0.7, 0.6).translate(1.95, 3.6, 0)), dark],            // Fenster
+    ]));
+
+    // Windkraftanlage: weisser Mast, Gondel vorne (+X), Rotor separat (dreht um X)
+    const white = mat(0xf1f2f0, 0.6), grey = mat(0xc9ccd0, 0.6);
+    this.protos.set('turbine-tower', this._protoFromParts([
+      [geo(new THREE.CylinderGeometry(0.32, 0.6, 24, 12).translate(0, 11.5, 0)), white],     // y −0.5 … 23.5
+      [geo(new THREE.BoxGeometry(3.2, 1.3, 1.3).translate(0.6, 24, 0)), white],               // Gondel
+      [geo(new THREE.CylinderGeometry(1.6, 1.8, 0.4, 12).translate(0, 0, 0)), grey],          // Fundament
+    ]));
+    const blade = () => new THREE.BoxGeometry(0.18, 11, 0.7).translate(0, 5.6, 0);
+    this.protos.set('turbine-rotor', this._protoFromParts([
+      [geo(new THREE.SphereGeometry(0.75, 12, 8).scale(1.4, 1, 1)), white],
+      [geo(blade()), white], [geo(blade().rotateX(TAU / 3)), white], [geo(blade().rotateX(-TAU / 3)), white],
     ]));
 
     // Mühlenhaus: 4.5 × 4 m, Wasserrad an der +X-Wand
@@ -486,10 +517,20 @@ export class DecorManager {
     return y;
   }
 
-  _lantern(e, x, z) {
-    const y = this._add(e, 'lantern', x, z, 0, { solid: 'circle', r: 0.15, top: Infinity, spotR: 0.4 });
-    this._add(e, 'lantern-glow', x, z, 0, { y: y + 2.32, noSpot: true });
-    e.lamps.push(new THREE.Vector3(x, y + 2.3, z));
+  /** Moderne Strassenlaterne; der Arm zeigt in Richtung `armDir` (Winkel in der XZ-Ebene, 0 = +X). */
+  _lantern(e, x, z, armDir = 0) {
+    // Kenney-Laterne: Mast im Ursprung, Arm entlang −Z → Drehung so, dass −Z nach armDir zeigt
+    const rot = Math.atan2(-Math.cos(armDir), -Math.sin(armDir));
+    const y = this._add(e, 'streetlight', x, z, rot, { solid: 'circle', r: 0.15, top: Infinity, spotR: 0.4 });
+    const hx = x + Math.cos(armDir) * 1.45, hz = z + Math.sin(armDir) * 1.45;
+    this._add(e, 'lantern-glow', hx, hz, 0, { y: y + 5.0, noSpot: true, scale: 0.8 });
+    e.lamps.push(new THREE.Vector3(hx, y + 4.9, hz));
+  }
+
+  /** Geparktes Auto (Deko, nicht fahrbar). */
+  _parkedCar(e, x, z, rot, rand) {
+    const cars = ['car-sedan', 'car-suv', 'car-hatch', 'car-taxi', 'car-van', 'car-sedan', 'car-suv', 'car-police'];
+    this._add(e, cars[Math.floor(rand() * cars.length)], x, z, rot, { solid: 'obb', shrink: 0.95, top: Infinity, spotR: 2.4 });
   }
 
   _banner(e, x, z, rot, red) {
@@ -517,10 +558,16 @@ export class DecorManager {
     this._add(e, 'box-large', 5.3, 8.6, 0.3, { solid: 'obb' });
     this._add(e, 'box', 5.3, 8.6, 0.9, { y: this.terrain.height(5.3, 8.6) + 0.57, noSpot: true });   // gestapelt
     // Laternen beidseits des Weges
-    this._lantern(e, 3.0, 6.4);
-    this._lantern(e, -3.0, 6.9);
-    this._lantern(e, 2.9, 15.6);
-    this._lantern(e, -3.2, 16.2);
+    this._lantern(e, 2.6, 6.4, Math.PI);
+    this._lantern(e, -2.6, 6.9, 0);
+    this._lantern(e, 2.6, 15.6, Math.PI);
+    this._lantern(e, -2.6, 16.2, 0);
+    this._lantern(e, 2.6, -3.0, Math.PI);
+    this._lantern(e, -2.6, -11.0, 0);
+    this._lantern(e, 2.6, -19.0, Math.PI);
+    // Abfallcontainer und Pflanzkübel
+    this._add(e, 'dumpster', 3.4, 1.8, Math.PI / 2, { solid: 'obb' });
+    this._add(e, 'planter', -3.6, 4.0, 0, { solid: 'obb' });
   }
 
   // ---------- Generierte Dörfer ----------
@@ -531,8 +578,13 @@ export class DecorManager {
     // Mitte: Brunnen oder Lagerfeuer mit Bänken
     if (rand() < 0.5) {
       if (this._free(e, cx, cz, 1.8)) this._add(e, 'fountain', cx, cz, rand() * TAU, { solid: 'circle', shrink: 0.98, spotR: 1.8 });
-    } else if (this._free(e, cx, cz, 1.0)) {
-      this._campfire(e, cx, cz, rand, { stand: rand() < 0.5, seats: 3, seatName: rand() < 0.5 ? 'tree-log' : 'stall-bench' });
+    } else if (this._free(e, cx, cz, 1.5)) {
+      // Strassencafé: Sonnenschirm mit Bänken
+      this._add(e, rand() < 0.5 ? 'parasol' : 'parasol-b', cx, cz, rand() * TAU, { solid: 'circle', r: 0.6, top: Infinity, spotR: 1.6 });
+      for (let i = 0; i < 2; i++) {
+        const ang = rand() * TAU + i * Math.PI;
+        this._add(e, 'stall-bench', cx + Math.cos(ang) * 1.9, cz + Math.sin(ang) * 1.9, -ang, { solid: 'obb', shrink: 0.9, spotR: 1.0 });
+      }
     }
 
     // Marktstände im Kreis um die Mitte, Front zur Mitte
@@ -563,46 +615,49 @@ export class DecorManager {
       }
     }
 
-    // Karren am Rand des Platzes
-    for (let t = 0; t < 8; t++) {
-      const a = rand() * TAU, r = 6.5 + rand() * 1.5;
-      const x = cx + Math.cos(a) * r, z = cz + Math.sin(a) * r;
-      if (!this._free(e, x, z, 1.3)) continue;
-      this._add(e, rand() < 0.5 ? 'cart' : 'cart-high', x, z, a + Math.PI / 2 + (rand() - 0.5) * 0.6, { solid: 'obb', shrink: 0.9 });
-      break;
-    }
-
-    // Banner am Platz
-    const nBanner = 2 + Math.floor(rand() * 2);
-    for (let i = 0, placed = 0; i < 10 && placed < nBanner; i++) {
-      const a = rand() * TAU, r = 6 + rand() * 1.5;
-      const x = cx + Math.cos(a) * r, z = cz + Math.sin(a) * r;
-      if (!this._free(e, x, z, 0.8)) continue;
-      this._banner(e, x, z, -a, rand() < 0.5);
+    // Geparkte Autos am äusseren Strassenrand (Ringstrasse r = 12, 5 m breit)
+    const spokes = v.spokes ?? [];
+    const angDiff = (p, q) => Math.abs(Math.atan2(Math.sin(p - q), Math.cos(p - q)));
+    const nCars = 2 + Math.floor(rand() * 3);
+    for (let i = 0, placed = 0; i < 20 && placed < nCars; i++) {
+      const a = rand() * TAU;
+      if (spokes.some((sa) => angDiff(sa, a) < 0.45)) continue;
+      const r = 13.6, x = v.x + Math.cos(a) * r, z = v.z + Math.sin(a) * r;
+      if (!this._free(e, x, z, 1.2, 0.3)) continue;
+      this._parkedCar(e, x, z, -a + (rand() < 0.5 ? 0 : Math.PI), rand);   // tangential zur Strasse
       placed++;
     }
 
-    // Laternen entlang des Häuserrings (innen oder aussen)
-    const nLamps = 3 + Math.floor(rand() * 3);
-    const l0 = rand() * TAU;
-    for (let i = 0; i < nLamps; i++) {
-      for (const r of [7.5, 6.5, 8.5, 18, 19.5]) {
-        const a = l0 + (i / nLamps) * TAU + (rand() - 0.5) * 0.3;
-        const x = v.x + Math.cos(a) * r, z = v.z + Math.sin(a) * r;
-        if (!this._free(e, x, z, 0.3)) continue;
-        this._lantern(e, x, z);
-        break;
-      }
+    // Ampeln und Strassenschilder an den Einmündungen der Ausfallstrassen
+    for (const sa of spokes) {
+      const tx = -Math.sin(sa), tz = Math.cos(sa);
+      const bx = v.x + Math.cos(sa) * 15.5, bz = v.z + Math.sin(sa) * 15.5;
+      const lx = bx + tx * 3.3, lz = bz + tz * 3.3;
+      if (this._free(e, lx, lz, 0.3, 0.5)) this._add(e, 'traffic-light', lx, lz, Math.atan2(Math.cos(sa), Math.sin(sa)) + Math.PI, { solid: 'circle', r: 0.15, top: Infinity, spotR: 0.4 });
+      const sx = bx - tx * 3.3, sz = bz - tz * 3.3;
+      if (this._free(e, sx, sz, 0.3, 0.5)) this._add(e, 'street-sign', sx, sz, -sa, { solid: 'circle', r: 0.1, top: Infinity, spotR: 0.4 });
+      // am Ende der Strasse: Stoppschild
+      const ex = v.x + Math.cos(sa) * 33 + tx * 3.2, ez = v.z + Math.sin(sa) * 33 + tz * 3.2;
+      if (this.terrain.height(ex, ez) > SEA_LEVEL + 0.5 && this._free(e, ex, ez, 0.3, 0.5)) this._add(e, 'stop-sign', ex, ez, -sa, { solid: 'circle', r: 0.1, top: Infinity, spotR: 0.4 });
     }
 
-    // Wegweiser am Dorfrand, Schild zeigt nach aussen
-    const nSigns = 1 + (rand() < 0.5 ? 1 : 0);
-    for (let i = 0, placed = 0; i < 12 && placed < nSigns; i++) {
-      const a = rand() * TAU, r = 19 + rand() * 3;
+    // Strassenlaternen am Platzrand, Arm über die Ringstrasse
+    const nLamps = 5 + Math.floor(rand() * 3);
+    const l0 = rand() * TAU;
+    for (let i = 0; i < nLamps; i++) {
+      const a = l0 + (i / nLamps) * TAU;
+      if (spokes.some((sa) => angDiff(sa, a) < 0.25)) continue;
+      const x = v.x + Math.cos(a) * 9.0, z = v.z + Math.sin(a) * 9.0;
+      if (!this._free(e, x, z, 0.3, 0.5)) continue;
+      this._lantern(e, x, z, a);
+    }
+
+    // Abfallcontainer und Pflanzkübel zwischen den Häusern
+    for (let i = 0, placed = 0; i < 12 && placed < 3; i++) {
+      const a = rand() * TAU, r = 16.5 + rand() * 2;
       const x = v.x + Math.cos(a) * r, z = v.z + Math.sin(a) * r;
-      if (this._slope(x, z) > 0.3 || this.terrain.height(x, z) < SEA_LEVEL + 0.8) continue;
-      if (!this._free(e, x, z, 0.4)) continue;
-      this._add(e, 'signpost', x, z, -a, { solid: 'circle', r: 0.12, top: Infinity });
+      if (spokes.some((sa) => angDiff(sa, a) < 0.3) || !this._free(e, x, z, 0.9, 0.8)) continue;
+      this._add(e, rand() < 0.5 ? 'dumpster' : 'planter', x, z, -a, { solid: 'obb' });
       placed++;
     }
   }
@@ -657,8 +712,8 @@ export class DecorManager {
       }
     }
 
-    // Windmühle auf einer offenen Hügelkuppe (selten)
-    if (rand() < 0.08) {
+    // Windkraftanlage auf einer offenen Hügelkuppe
+    if (rand() < 0.2) {
       const s = this._pick(e, rand, 24, (x, z, h) => {
         if (h < 8 || h > 25 || t.forest(x, z) > 0.25 || this._slope(x, z) > 0.12) return false;
         for (let i = 0; i < 6; i++) {
@@ -743,30 +798,29 @@ export class DecorManager {
 
   _meadowProps(e, x, z, rand) {
     const roll = rand();
-    if (roll < 0.55) {
+    if (roll < 0.45) {
+      // abgestelltes Auto (Ausflügler), manchmal mit Abfallcontainer
       const rot = rand() * TAU;
-      this._add(e, rand() < 0.5 ? 'cart' : 'cart-high', x, z, rot, { solid: 'obb', shrink: 0.9 });
-      // loses Rad daneben, leicht angelehnt
-      const sx = x + Math.cos(rot) * 1.3, sz = z - Math.sin(rot) * 1.3;
-      if (rand() < 0.6) this._add(e, 'wheel', sx, sz, rot + Math.PI / 2, { rz: 0.15, solid: 'circle', r: 0.4 });
-      if (rand() < 0.5) this._add(e, 'barrel', x - Math.cos(rot) * 1.4, z + Math.sin(rot) * 1.4, rand() * TAU, { solid: 'circle' });
-    } else if (roll < 0.85) {
-      this._add(e, 'signpost', x, z, rand() * TAU, { solid: 'circle', r: 0.12, top: Infinity });
-      if (rand() < 0.5) this._add(e, 'box', x + 0.8, z + 0.5, rand() * TAU, {});
+      this._parkedCar(e, x, z, rot, rand);
+      if (rand() < 0.4) this._add(e, 'dumpster', x - Math.cos(rot) * 2.6, z + Math.sin(rot) * 2.6, rot, { solid: 'obb' });
+    } else if (roll < 0.75) {
+      this._add(e, 'street-sign', x, z, rand() * TAU, { solid: 'circle', r: 0.1, top: Infinity });
     } else {
-      this._add(e, 'wheel', x, z, rand() * TAU, { rz: Math.PI / 2 - 0.05, y: this.terrain.height(x, z) + 0.3 });
-      this._add(e, 'resource-planks', x + 1.2, z + 0.4, rand() * TAU, {});
+      // Baustelle: Absperrung und Pylonen
+      const rot = rand() * TAU;
+      this._add(e, 'barrier', x, z, rot, { solid: 'obb' });
+      for (let i = 0; i < 3; i++) this._add(e, 'cone', x + Math.cos(rot) * (1.4 + i * 0.7), z - Math.sin(rot) * (1.4 + i * 0.7), rand() * TAU, {});
+      this._add(e, 'resource-planks', x - Math.cos(rot) * 1.6, z + Math.sin(rot) * 1.6, rand() * TAU, {});
     }
   }
 
   _windmill(e, x, z, rand) {
     const rot = rand() * TAU;
-    const y = this._add(e, 'windmill-tower', x, z, rot, { solid: 'circle', r: 2.4, top: Infinity, spotR: 3 });
-    // Flügel vorne am Turm (lokal +X), drehen um die eigene X-Achse
-    const fx = x + Math.cos(rot) * 2.75, fz = z - Math.sin(rot) * 2.75;
-    const rotor = this._add(e, 'mill-rotor', fx, fz, rot, { dynamic: true, y: y + 6.4, noSpot: true });
-    e.anims.push({ kind: A_ROTOR, obj: rotor, ph: 0, base: 0, speed: 0.35 + rand() * 0.3 });
-    if (rand() < 0.6) this._add(e, 'box-large', x - Math.cos(rot) * 3.3, z + Math.sin(rot) * 3.3, rot, { solid: 'obb' });
+    // modern: Windkraftanlage statt Windmühle
+    const ty = this._add(e, 'turbine-tower', x, z, rot, { solid: 'circle', r: 0.7, top: Infinity, spotR: 2.5 });
+    const rx = x + Math.cos(rot) * 2.4, rz = z - Math.sin(rot) * 2.4;
+    const rotor = this._add(e, 'turbine-rotor', rx, rz, rot, { dynamic: true, y: ty + 24, noSpot: true });
+    e.anims.push({ kind: A_ROTOR, obj: rotor, ph: 0, base: 0, speed: 0.6 + rand() * 0.4 });
   }
 
   _watermill(e, x, z, dir, rand) {

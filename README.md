@@ -1,6 +1,6 @@
 # Mein erstes Spiel
 
-Eine prozedural erzeugte 3D-Open-World im Browser – gebaut mit [three.js](https://threejs.org) und **WebGPU** (Fallback WebGL2).
+Eine prozedural erzeugte, moderne 3D-Open-World im Browser (Siedlungen mit Strassen, Ampeln, Autos, Windrädern) – gebaut mit [three.js](https://threejs.org) und **WebGPU** (Fallback WebGL2).
 
 **Spielen:** https://drno14.github.io/mein-erstes-spiel/ · **Bewegungs-Editor:** https://drno14.github.io/mein-erstes-spiel/editor.html
 

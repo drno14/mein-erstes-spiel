@@ -2,6 +2,7 @@ import * as THREE from 'three/webgpu';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { createTerrain, SEA_LEVEL } from './world/terrain.js';
 import { createProps } from './world/props.js';
+import { loadModern, placeBuilding } from './world/modern.js';
 import { ChunkManager } from './world/chunks.js';
 import { NpcManager } from './npc.js';
 import { createSkeletonView } from './skeletonView.js';
@@ -109,6 +110,34 @@ if (wiese) wiese.visible = false;   // das Gelände übernimmt den Boden
 dorf.getObjectByName('Weg')?.traverse((o) => { if (o.isMesh) o.castShadow = false; });
 scene.add(dorf);
 
+// ---------- Moderne Welt: Kenney City Kits (Häuser, Geschäfte, Hochhäuser) ----------
+props.modern = await loadModern(loader);
+// Startdorf modernisieren: Holzhäuser aus Blender → moderne Einfamilienhäuser, Weg → Asphalt
+const startHouseObstacles = [];
+{
+  const weg = dorf.getObjectByName('Weg');
+  weg?.traverse((o) => { if (o.isMesh) { o.material = o.material.clone(); o.material.color.setHex(0x3b3e44); o.material.map = null; o.material.roughness = 0.92; } });
+  const old = [];
+  dorf.traverse((o) => { if (/^H\d_/.test(o.name)) old.push(o); });
+  dorf.updateMatrixWorld(true);
+  const picks = ['building-type-b', 'building-type-e', 'building-type-k', 'building-type-o', 'building-type-s'];
+  for (let i = 1; i <= 5; i++) {
+    const haus = old.find((o) => o.name === `H${i}_Haus`);
+    if (!haus) continue;
+    const box = new THREE.Box3().setFromObject(haus);
+    const c = box.getCenter(new THREE.Vector3());
+    const side = c.x > 0 ? 1 : -1;
+    const proto = props.modern.house.find((h) => h.f.endsWith(picks[i - 1])) ?? props.modern.house[i];
+    const sc = Math.min(6 / proto.w, 6.5 / proto.d, 8);
+    const depth = proto.d * sc;
+    const inner = side > 0 ? Math.max(box.min.x, 2.2) : Math.min(box.max.x, -2.2);
+    const b = placeBuilding(proto, terrain, inner + side * depth / 2, c.z, side > 0 ? -Math.PI / 2 : Math.PI / 2, sc);
+    scene.add(b.obj);
+    startHouseObstacles.push(b.obstacle);
+  }
+  for (const o of old) o.removeFromParent();
+}
+
 // Spieler
 const player = new THREE.Group();
 const figur = prepareFigure(figurGltf.scene);
@@ -172,6 +201,7 @@ dorf.traverse((o) => {
   if (base === 'Stamm') dorfObstacles.push({ type: 'circle', x: c.x, z: c.z, r: Math.max(sx, sz), top: Infinity });
   else dorfObstacles.push({ type: 'obb', x: c.x, z: c.z, cos: 1, sin: 0, hw: sx, hd: sz, top: base === 'Latte' ? 0.68 : Infinity });
 });
+dorfObstacles.push(...startHouseObstacles);
 
 // ---------- Zerstörbares im Startdorf (Blender-Modell): Bäume, Büsche, Steine, Blumen, Zaun ----------
 const dorfTargets = [];

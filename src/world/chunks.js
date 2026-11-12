@@ -2,11 +2,12 @@ import * as THREE from 'three/webgpu';
 import { CHUNK_SIZE, SEA_LEVEL } from './terrain.js';
 import { mulberry32, hash2 } from './noise.js';
 import { propMaterial } from './props.js';
+import { placeBuilding, buildVillageRoads, CITY_SCALE } from './modern.js';
 
 const ZERO = new THREE.Matrix4().makeScale(0, 0, 0);   // "unsichtbare" Instanz
 const START_CLEAR = 42;       // im Blender-Dorf keine generierten Objekte
 const VILLAGE_CHANCE = 0.07;   // Anteil der Chunks mit Dorf
-const VILLAGE_CLEAR = 24;      // Radius ohne Bäume um ein Dorfzentrum
+const VILLAGE_CLEAR = 36;      // Radius ohne Bäume um ein Dorfzentrum (Häuserring + Ausfallstrassen)
 
 /**
  * Lädt Chunks rund um den Spieler, entlädt ferne. Jeder Chunk ist rein aus
@@ -82,28 +83,35 @@ export class ChunkManager {
     // Dorf
     const village = this.villageAt(cx, cz);
     const housesHere = [];
-    if (village) {
-      const n = 3 + Math.floor(rand() * 4);
-      for (let i = 0; i < n; i++) {
-        const a = (i / n) * Math.PI * 2 + rand() * 0.5;
-        const r = 9 + rand() * 6;
-        const hx = village.x + Math.cos(a) * r, hz = village.z + Math.sin(a) * r;
-        const house = props.houses[Math.floor(rand() * props.houses.length)];
-        // Tür (−Z lokal) zeigt zur Dorfmitte
-        // lokales −Z nach Drehung um Y = (−sin r, −cos r) → soll auf (Mitte − Haus) zeigen
-        const rot = Math.atan2(-(village.x - hx), -(village.z - hz));
-        const corners = [[-1, -1], [1, -1], [1, 1], [-1, 1]].map(([sx, sz]) => {
-          const lx = (sx * house.w) / 2, lz = (sz * house.d) / 2;
-          return terrain.height(hx + lx * Math.cos(rot) + lz * Math.sin(rot), hz - lx * Math.sin(rot) + lz * Math.cos(rot));
-        });
-        const base = Math.min(...corners);
-        const mesh = new THREE.Mesh(house.geo, propMaterial);
-        mesh.position.set(hx, base, hz);
-        mesh.rotation.y = rot;
-        mesh.castShadow = mesh.receiveShadow = true;
-        group.add(mesh);
+    if (village && props.modern) {
+      // Moderne Siedlung: Platz, Ringstrasse, Ausfallstrassen, Häuser (in Städten auch Geschäfte/Hochhäuser)
+      const TAU = Math.PI * 2;
+      const town = rand() < 0.35;
+      const ns = 2 + (rand() < 0.5 ? 1 : 0), s0 = rand() * TAU;
+      const spokes = Array.from({ length: ns }, (_, i) => s0 + (i / ns) * TAU + (rand() - 0.5) * 0.5);
+      group.add(buildVillageRoads(terrain, village.x, village.z, { ring: 12, spokes, spokeLen: 34, plaza: 18 }));
+      village.spokes = spokes; village.town = town;
+      const M = props.modern;
+      const angDiff = (a, b) => Math.abs(Math.atan2(Math.sin(a - b), Math.cos(a - b)));
+      let a = rand() * TAU;
+      const end = a + TAU;
+      for (let guard = 0; guard < 80 && a < end; guard++) {
+        const roll = rand();
+        const pool = town ? (roll < 0.18 ? M.tower : roll < 0.65 ? M.shop : M.house) : (roll < 0.12 ? M.shop : M.house);
+        const proto = pool[Math.floor(rand() * pool.length)];
+        const w = proto.w * CITY_SCALE, d = proto.d * CITY_SCALE;
+        const r = 15.5 + d / 2, half = (w / 2 + 1.5) / r;
+        const mid = a + half;
+        if (mid + half > end) break;
+        if (spokes.some((sa) => angDiff(sa, mid) < half + 4 / r)) { a += 0.1; continue; }
+        const hx = village.x + Math.cos(mid) * r, hz = village.z + Math.sin(mid) * r;
+        // Vorderseite (+Z des Modells) zeigt zur Strasse/Dorfmitte
+        const b = placeBuilding(proto, terrain, hx, hz, Math.atan2(village.x - hx, village.z - hz));
+        b.obj.traverse((o) => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
+        group.add(b.obj);
         housesHere.push({ x: hx, z: hz });
-        obstacles.push({ type: 'obb', x: hx, z: hz, cos: Math.cos(rot), sin: Math.sin(rot), hw: house.w / 2 + 0.05, hd: house.d / 2 + 0.05, top: Infinity });
+        obstacles.push(b.obstacle);
+        a = mid + half;
       }
     }
 

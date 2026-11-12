@@ -12,3 +12,5 @@ Alle Modelle in diesem Ordner sind CC0 (Public Domain), frei nutzbar ohne Namens
 - items/extra/      Kenney – Food Kit (kenney.nl; Dateien ohne Präfix, Textur Textures/colormap.png),
                    Quaternius – Ultimate RPG Items Pack (rpg_*), Quaternius – Fantasy Props MEGAKIT (mk_*);
                    Flüssigkeits-/Glasfarben der rpg_potion*-Modelle nachträglich gesetzt
+
+models/modern/ – Kenney "City Kit (Suburban)" 2.0, "City Kit (Commercial)" 2.1, "City Kit (Roads)" 2.2 – CC0 1.0 (www.kenney.nl), via opengameart.org
