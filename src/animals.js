@@ -521,6 +521,13 @@ export class AnimalManager {
     for (let i = 0; i < this.all.length; i++) {
       const a = this.all[i];
       const p = a.root.position;
+      if (a.dead) {   // umgefallen: kippen, kurz liegen, dann versinken und verschwinden
+        a.deadT += dt;
+        a.root.rotation.z = Math.min(1, a.deadT / 0.5) * (Math.PI / 2) * a.fallSide;
+        if (a.deadT > 3) p.y -= dt * 0.4;
+        if (a.deadT > 5) { this.removeAt(i); i--; }
+        continue;
+      }
       const dist = Math.hypot(p.x - this.px, p.z - this.pz);
       a.root.visible = a.ridden || dist < VISIBLE_DIST;
       if (a.ridden) {   // Reiter steuert root; wir spielen nur die Animation weiter
@@ -658,7 +665,7 @@ export class AnimalManager {
   collides(x, z, radius) {
     for (let i = 0; i < this.all.length; i++) {
       const a = this.all[i];
-      if (!a.sp.big || a.ridden) continue;
+      if (!a.sp.big || a.ridden || a.dead) continue;
       const p = a.root.position, t = a.tpl;
       const ex = x - p.x, ez = z - p.z;
       const reach = t.len / 2 + radius;
@@ -672,11 +679,47 @@ export class AnimalManager {
     return false;
   }
 
+  // ---------- Schnittstelle für das Zerstörungs-System (combat.js) ----------
+
+  /** Treffbare Tiere in der Nähe (nur an Land; gerittene nicht). */
+  *targetsNear(x, z) {
+    for (const a of this.all) {
+      if (a.dead || a.ridden || a.sp.medium !== 'land') continue;
+      const p = a.root.position;
+      const ex = p.x - x, ez = p.z - z;
+      if (ex * ex + ez * ez > 49) continue;
+      yield (a.target ??= this._makeTarget(a));
+    }
+  }
+
+  _makeTarget(a) {
+    const NAME = { cow: 'Kuh', horse: 'Pferd', zebra: 'Zebra', llama: 'Lama', pig: 'Schwein', sheep: 'Schaf', pug: 'Mops',
+      cat: 'Katze', dog: 'Hund', wolf: 'Wolf', red_fox: 'Fuchs', chick: 'Küken' };
+    const len = a.tpl.len ?? 1;
+    const hp = Math.round(15 + len * 30);
+    const mgr = this;
+    return {
+      animal: a, material: 'tier', name: NAME[a.name] ?? 'Tier', hp, maxHp: hp,
+      get x() { return a.root.position.x; }, get z() { return a.root.position.z; }, get y() { return a.root.position.y; },
+      r: (a.tpl.width ?? 0.6) / 2 + 0.2, height: Math.max(0.3, len * 0.6), shakeObj: a.root,
+      onHit(fromX, fromZ) {   // erschrecken → wegrennen
+        a.state = 'flee'; a.timer = 3;
+        if (a.herd) a.herd.panicUntil = mgr.time + 4;
+      },
+      destroy() {
+        a.dead = true; a.deadT = 0; a.fallSide = Math.random() < 0.5 ? -1 : 1;
+        a.mixer.stopAllAction();
+        const n = len > 1.6 ? 3 : len > 0.8 ? 2 : 1;
+        return a.name === 'chick' ? [['chickenleg', 1]] : [['rohfleisch', n]];
+      },
+    };
+  }
+
   /** Nächstes Pferd innerhalb maxDist → { animal, object3d } oder null. */
   findRideable(pos, maxDist) {
     let best = null, bestD = maxDist * maxDist;
     for (const a of this.all) {
-      if (a.name !== 'horse') continue;
+      if (a.name !== 'horse' || a.dead) continue;
       const p = a.root.position;
       const d = (p.x - pos.x) ** 2 + (p.z - pos.z) ** 2;
       if (d <= bestD) { bestD = d; best = a; }

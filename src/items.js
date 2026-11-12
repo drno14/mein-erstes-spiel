@@ -1228,6 +1228,9 @@ export class ItemManager {
   /** Kurze Meldung in der Leiste anzeigen. */
   say(text, sec) { this._say(text, sec); }
 
+  /** Deutscher Name eines Gegenstands. */
+  nameOf(key) { return CATALOG[key]?.n ?? key; }
+
   /** Zerstörbare Möbel (Waffenständer, Obstkisten, Fässer, Truhen) in der Nähe. */
   *targetsNear(x, z) {
     const MAT = {

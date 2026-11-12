@@ -12,6 +12,7 @@ import { VehicleManager } from './vehicles.js';
 import { AnimalManager } from './animals.js';
 import { DecorManager } from './world/decor.js';
 import { ItemManager, addPoseOffsets } from './items.js';
+import { Combat } from './combat.js';
 
 // ---------- Einstellungen ----------
 const WALK_SPEED = 1.7;      // Gehen mit W (m/s)
@@ -170,6 +171,57 @@ dorf.traverse((o) => {
   else dorfObstacles.push({ type: 'obb', x: c.x, z: c.z, cos: 1, sin: 0, hw: sx, hd: sz, top: base === 'Latte' ? 0.68 : Infinity });
 });
 
+// ---------- Zerstörbares im Startdorf (Blender-Modell): Bäume, Büsche, Steine, Blumen, Zaun ----------
+const dorfTargets = [];
+{
+  const KINDS = ['Stamm', 'Krone', 'Busch', 'Stein', 'Latte', 'Pfosten', 'Blume'];
+  const baseOf = (n) => (n || '').replace(/[._]?\d+$/, '');
+  const found = {};
+  dorf.traverse((o) => {
+    const b = baseOf(o.name);
+    if (!KINDS.includes(b) || baseOf(o.parent?.name) === b) return;   // nur oberstes Objekt je Teil
+    const box = new THREE.Box3().setFromObject(o);
+    (found[b] ??= []).push({ o, c: box.getCenter(new THREE.Vector3()), box });
+  });
+  const removeObstacle = (ob) => { const i = dorfObstacles.indexOf(ob); if (i >= 0) dorfObstacles.splice(i, 1); };
+  const nearestObstacle = (x, z, pred) => {
+    let best = null, bd = Infinity;
+    for (const ob of dorfObstacles) { if (!pred(ob)) continue; const d = Math.hypot(ob.x - x, ob.z - z); if (d < bd) { bd = d; best = ob; } }
+    return bd < 1.5 ? best : null;
+  };
+  const add = (name, material, hp, objs, c, r, height, obstacles, drops) => {
+    dorfTargets.push({ name, material, hp, maxHp: hp, x: c.x, z: c.z, y: 0, r, height, shakeObj: objs[0].o,
+      destroy() {
+        this.dead = true;
+        for (const { o } of objs) o.visible = false;
+        for (const ob of obstacles) if (ob) removeObstacle(ob);
+        return drops;
+      } });
+  };
+  // Bäume: Stamm + Kronen darüber
+  for (const s of found.Stamm ?? []) {
+    const crowns = (found.Krone ?? []).filter((k) => Math.hypot(k.c.x - s.c.x, k.c.z - s.c.z) < 1.8);
+    const top = Math.max(s.box.max.y, ...crowns.map((k) => k.box.max.y));
+    add('Baum', 'holz', 90, [s, ...crowns], s.c, 0.35, top,
+      [nearestObstacle(s.c.x, s.c.z, (ob) => ob.type === 'circle')], [['holz', 4]]);
+  }
+  for (const b of found.Busch ?? []) add('Busch', 'pflanze', 25, [b], b.c, 0.5, b.box.max.y, [], []);
+  for (const s of found.Stein ?? []) add('Stein', 'stein', 30, [s], s.c, 0.3, s.box.max.y, [], [['stein', 1]]);
+  for (const f of found.Blume ?? []) add('Blume', 'pflanze', 4, [f], f.c, 0.15, 0.3, [], []);
+  // Zaun: pro Seite (x < 0 / x > 0) ein Ziel aus Latten und Pfosten; Trefferpunkt = nächste Stelle am Zaun
+  for (const side of [-1, 1]) {
+    const parts = [...(found.Latte ?? []), ...(found.Pfosten ?? [])].filter((p) => Math.sign(p.c.x) === side);
+    if (!parts.length) continue;
+    const zs = parts.map((p) => p.c.z), z0 = Math.min(...zs) - 0.5, z1 = Math.max(...zs) + 0.5, fx = parts[0].c.x;
+    const obs = dorfObstacles.filter((ob) => ob.top === 0.68 && Math.sign(ob.x) === side);
+    const t = { name: 'Zaun', material: 'holz', hp: 60, maxHp: 60, x: fx, z: (z0 + z1) / 2, y: 0, r: 0.15, height: 0.8, shakeObj: null,
+      get zNear() { return THREE.MathUtils.clamp(player.position.z, z0, z1); },
+      destroy() { this.dead = true; for (const { o } of parts) o.visible = false; for (const ob of obs) removeObstacle(ob); return [['planken', 3]]; } };
+    Object.defineProperty(t, 'z', { get: () => THREE.MathUtils.clamp(player.position.z, z0, z1) });
+    dorfTargets.push(t);
+  }
+}
+
 function hits(o, x, z, feetY, r = PLAYER_RADIUS) {
   if (feetY >= o.top) return false;                  // drübergesprungen
   const dx = x - o.x, dz = z - o.z;
@@ -203,6 +255,14 @@ const items = new ItemManager({ scene, terrain, chunks, seed: SEED, loader, figu
 items.setDecor(decor);
 extraObstacleSources.push((x, z) => items.obstaclesNear(x, z));
 const itemPose = { values: {} };
+
+// ---------- Zerstören (R = schlagen): Werkzeug × Material bestimmt den Schaden ----------
+const combat = new Combat({ scene, camera, items, player, getYaw: () => yaw });
+combat.addSource((x, z) => chunks.targetsNear(x, z));      // Bäume, Büsche, Felsen
+combat.addSource((x, z) => decor.targetsNear(x, z));       // Kisten, Fässer, Karren, Stände …
+combat.addSource((x, z) => items.targetsNear(x, z));       // Waffenständer, Obstkisten, Truhen
+combat.addSource((x, z) => animals.targetsNear(x, z));     // Tiere
+combat.addSource((x, z) => dorfTargets.filter((t) => !t.dead && Math.hypot(t.x - x, t.z - z) < 7));   // Startdorf
 
 // Reithaltung: wird beim Reiten zu den Editor-Einstellungen addiert
 const RIDE_POSE = { legForward: 70, legSpread: 22, kneeBend: 75, armForward: 20, elbowBend: 40, lean: 8 };
@@ -424,6 +484,7 @@ function updateWorld(dt, p, now) {
   animals.update(dt, p);
   decor.update(dt, p, situations.night);
   items.update(dt, p, yaw);
+  combat.update(dt);
   for (const u of worldUpdaters) u(dt, p, situations.night);
   const prompt = vehicles.prompt || items.prompt;
   if (prompt !== lastPrompt) { lastPrompt = prompt; promptEl.textContent = prompt; promptEl.style.display = prompt ? 'block' : 'none'; }
@@ -486,7 +547,7 @@ function statsExtra() { return statsSources.map((f) => f()).join(''); }
 
 // Für Tests im Browser
 window.__game = {
-  player, terrain, chunks, npcs, isWebGPU, anim, camera, SEED, skeletonView, situations, vehicles, animals, decor, items,
+  player, terrain, chunks, npcs, isWebGPU, anim, camera, SEED, skeletonView, situations, vehicles, animals, decor, items, combat, dorfTargets,
   get drive() { return drive; },
   get poseSettings() { return poseSettings; },
   get yaw() { return yaw; }, set yaw(v) { yaw = v; },
