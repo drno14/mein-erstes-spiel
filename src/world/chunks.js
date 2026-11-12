@@ -121,6 +121,7 @@ export class ChunkManager {
       const x = x0 + rand() * CHUNK_SIZE, z = z0 + rand() * CHUNK_SIZE;
       const roll = rand(), rot = rand() * Math.PI * 2, sc = 0.75 + rand() * 0.6;
       if (Math.hypot(x, z) < START_CLEAR) continue;
+      if (this.reserved?.some((r) => x > r.x0 && x < r.x1 && z > r.z0 && z < r.z1)) continue;   // Stadtzentrum
       const h = terrain.height(x, z);
       if (h < SEA_LEVEL + 0.8) continue;
       const slope = 1 - terrain.normal(x, z).y;

@@ -180,7 +180,7 @@ export class Business {
     for (const st of this.stands) {
       const goods = st.stock.filter((s) => s.n > 0);
       if (!goods.length || st.waiting >= 2) continue;
-      const free = this.npcs.all.filter((n) => !n.ko && !n.errand && n.state !== 'flee' &&
+      const free = this.npcs.all.filter((n) => !n.ko && !n.errand && !n.special && n.state !== 'flee' &&
         Math.hypot(n.root.position.x - st.x, n.root.position.z - st.z) < CUSTOMER_RANGE);
       if (!free.length) continue;
       const npc = free[Math.floor(Math.random() * free.length)];

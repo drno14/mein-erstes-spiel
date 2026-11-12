@@ -16,6 +16,8 @@ import { ItemManager, addPoseOffsets } from './items.js';
 import { Combat } from './combat.js';
 import { Crafting } from './crafting.js';
 import { Business } from './business.js';
+import { Services } from './services.js';
+import { Life } from './life.js';
 
 // ---------- Einstellungen ----------
 const WALK_SPEED = 1.7;      // Gehen mit W (m/s)
@@ -112,6 +114,10 @@ scene.add(dorf);
 
 // ---------- Moderne Welt: Kenney City Kits (Häuser, Geschäfte, Hochhäuser) ----------
 props.modern = await loadModern(loader);
+// Stadtzentrum: Spital, Polizei, Feuerwehr, Bank
+const services = new Services({ scene, terrain, loader, modern: props.modern });
+await services.build();
+chunks.reserved = [services.reserved];
 // Startdorf modernisieren: Holzhäuser aus Blender → moderne Einfamilienhäuser, Weg → Asphalt
 const startHouseObstacles = [];
 {
@@ -263,6 +269,7 @@ function hits(o, x, z, feetY, r = PLAYER_RADIUS) {
 }
 
 const extraObstacleSources = [];   // weitere Module (z. B. Deko) hängen hier ihre obstaclesNear(x,z) an
+extraObstacleSources.push((x, z) => services.obstaclesNear(x, z));   // Stadtzentrum
 
 /** Häuser, Bäume, Zäune, Felsen, Deko (für Spieler, NPCs und Fahrzeuge). */
 function worldCollides(x, z, feetY, r = PLAYER_RADIUS) {
@@ -283,7 +290,7 @@ const animals = new AnimalManager({ scene, terrain, chunks, seed: SEED, loader,
 const vehicles = new VehicleManager({ scene, terrain, chunks, seed: SEED, loader, worldCollides, animals });
 // ---------- Gegenstände: Waffen, Essen, Werkzeuge, Schätze (F aufheben, 1–9/Q Fach, R benutzen, G ablegen) ----------
 const items = new ItemManager({ scene, terrain, chunks, seed: SEED, loader, figureRoot: figur,
-  canAct: () => !vehicles.active, worldCollides });
+  canAct: () => !vehicles.active && !window.__game?.life?.down, worldCollides });
 items.setDecor(decor);
 extraObstacleSources.push((x, z) => items.obstaclesNear(x, z));
 const itemPose = { values: {} };
@@ -446,10 +453,10 @@ function update(dt, now) {
   player.rotation.y = yaw;
   const dirX = Math.sin(yaw), dirZ = Math.cos(yaw);
 
-  const moving = keys.has('KeyW');
+  const moving = keys.has('KeyW') && !life.down;
   const inWater = p.y < SEA_LEVEL - 0.25;
-  sprinting = moving && !inWater && (keys.has('ShiftLeft') || keys.has('ShiftRight'));
-  const targetSpeed = moving ? (sprinting ? SPRINT_SPEED : WALK_SPEED) * (inWater ? WATER_SPEED : 1) : 0;
+  sprinting = moving && !inWater && life.canSprint && (keys.has('ShiftLeft') || keys.has('ShiftRight'));
+  const targetSpeed = moving ? (sprinting ? SPRINT_SPEED : WALK_SPEED) * (inWater ? WATER_SPEED : 1) * life.speedFactor : 0;
   speed += (targetSpeed - speed) * (1 - Math.exp(-ACCEL * dt));   // weich beschleunigen/bremsen
   if (speed > 0.05) {
     const step = speed * dt;
@@ -475,6 +482,7 @@ function update(dt, now) {
   p.y += velocityY * dt;
   const ground = terrain.height(p.x, p.z);
   if (p.y <= ground) {
+    if (!onGround && !inWater) life.fall(-velocityY);   // Sturzverletzung bei hartem Aufprall
     p.y = ground; velocityY = 0; onGround = true;
   } else if (onGround && velocityY <= 0 && p.y - ground < 0.4 + speed * dt * 1.6) {
     p.y = ground; velocityY = 0;                // bergab am Boden bleiben
@@ -534,6 +542,7 @@ function updateWorld(dt, p, now) {
   combat.update(dt);
   crafting.update();
   business.update(dt, camera);
+  life.update(dt, now / 1000);
   for (const u of worldUpdaters) u(dt, p, situations.night);
   const prompt = vehicles.prompt || items.prompt;
   if (prompt !== lastPrompt) { lastPrompt = prompt; promptEl.textContent = prompt; promptEl.style.display = prompt ? 'block' : 'none'; }
@@ -561,6 +570,13 @@ const business = new Business({
   shopsNear: (x, z, d) => [...decor.targetsNear(x, z)].some((t) => !t.dead && t.name === 'Marktstand' && Math.hypot(t.x - x, t.z - z) < d),
 });
 extraObstacleSources.push((x, z) => business.obstacles(x, z));
+// ---------- Echtes Leben: Gesundheit, Verletzungen, Spital, Polizei, Feuer, Feuerwehr, Bank, Pistole ----------
+const life = new Life({
+  scene, camera, player, items, business, terrain, npcs, combat, animals, services, situations,
+  getYaw: () => yaw, inVehicle: () => vehicles.active,
+  blocked: (x, z) => worldCollides(x, z, terrain.height(x, z)),
+  teleport: (x, z) => { player.position.set(x, terrain.height(x, z), z); velocityY = 0; },
+});
 await Promise.all([vehicles.init(), animals.init(), decor.init(), items.init()]);
 await business.init();
 statsSources.push(() => ` · ${items.count} Gegenstände`);
@@ -602,7 +618,7 @@ addEventListener('resize', () => {
 function statsExtra() { return statsSources.map((f) => f()).join(''); }
 
 // Für Tests im Browser
-window.__game = { crafting, business,
+window.__game = { crafting, business, life, services,
   player, terrain, chunks, npcs, isWebGPU, anim, camera, SEED, skeletonView, situations, vehicles, animals, decor, items, combat, dorfTargets,
   get drive() { return drive; },
   get poseSettings() { return poseSettings; },

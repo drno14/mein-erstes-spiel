@@ -106,7 +106,16 @@ export class Combat {
     const table = DAMAGE[tool] ?? DAMAGE.hand;
     const base = table[t.material] ?? 5;
     const dmg = Math.max(1, Math.round(base * (0.9 + Math.random() * 0.2)));
+    // Fackel: Brennbares fängt Feuer
+    if (tool === 'fackel' && (t.material === 'holz' || t.material === 'pflanze' || t.material === 'stoff') && Math.random() < 0.6) this.onIgnite?.(t);
+    this.applyDamage(t, dmg, { tool, base });
+  }
+
+  /** Schaden an einem Ziel (Schlag, Schuss, Feuer). Gibt true zurück, wenn es dabei kaputtging. */
+  applyDamage(t, dmg, { tool = 'hand', base = dmg, quiet = false, cause = 'schlag' } = {}) {
+    if (t.dead || t.hp <= 0) return false;
     t.hp = Math.max(0, t.hp - dmg);
+    this.onHitTarget?.(t, cause, t.hp <= 0);
     t.onHit?.(this.player.position.x, this.player.position.z);
 
     // Effekte: Splitter + Wackeln + Lebensbalken
@@ -126,6 +135,9 @@ export class Combat {
       const what = drops.length ? ` – ${drops.map(([key, n]) => `${n}× ${this.items.nameOf?.(key) ?? key}`).join(', ')}` : '';
       this.items.say(`${t.name} ${t.doneVerb ?? (t.material === 'tier' ? 'erlegt' : 'zerstört')}${what}`, 2.5);
       this.bar = null;
+      return true;
+    } else if (quiet) {
+      return false;
     } else if (base <= 5 && tool !== 'hand') {
       this.items.say(`Mit ${TOOL_NAME[tool] === 'Faust' ? 'der Faust' : `dieser ${TOOL_NAME[tool]}`} geht das kaum – nimm ${BEST[t.material]}!`, 2.5);
     } else if (tool === 'hand' && t.maxHp > 20 && t.hp > t.maxHp - 6) {

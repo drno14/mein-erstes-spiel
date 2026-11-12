@@ -116,7 +116,7 @@ const CATALOG = {
   farmcrate_apple:  { f: IT + 'essen/farmcrate_apple', n: 'Apfelkiste', c: D, size: 0.7 },
   farmcrate_carrot: { f: IT + 'essen/farmcrate_carrot', n: 'Karottenkiste', c: D, size: 0.7 },
   // ---- Schätze ----
-  potion_red:       { f: IT + 'schaetze/potion1_filled', n: 'Heiltrank', c: S, size: 0.2, pick: true, stack: true, hold: 'palm', drink: true, e: 30, msg: 'Du fühlst dich wie neu!' },
+  potion_red:       { f: IT + 'schaetze/potion1_filled', n: 'Heiltrank', c: S, size: 0.2, pick: true, stack: true, hold: 'palm', drink: true, e: 30, heal: 50, msg: 'Du fühlst dich wie neu!' },
   potion_blue:      { f: IT + 'schaetze/potion2_filled', n: 'Krafttrank', c: S, size: 0.22, pick: true, stack: true, hold: 'palm', drink: true, e: 20, msg: 'Du fühlst dich stark!' },
   potion_green:     { f: IT + 'schaetze/potion3_filled', n: 'Zaubertrank', s: 'Zauber­trank', c: S, size: 0.22, pick: true, stack: true, hold: 'palm', drink: true, e: 15, msg: 'Alles funkelt ein bisschen …' },
   potion_purple:    { f: IT + 'schaetze/potion4_filled', n: 'Ausdauertrank', s: 'Ausdauer­trank', c: S, size: 0.22, pick: true, stack: true, hold: 'palm', drink: true, e: 40, msg: 'Du könntest ewig laufen!' },
@@ -135,6 +135,9 @@ const CATALOG = {
   planken:          { f: 'survival/resource-planks', n: 'Bretter', c: R, size: 1.0, pick: true, stack: true, hold: 'palm', msg: 'Damit liesse sich etwas bauen.' },
   stein:            { f: 'survival/resource-stone', n: 'Stein', c: R, size: 0.4, pick: true, stack: true, hold: 'palm', msg: 'Ein schwerer Stein.' },
   rohfleisch:       { f: IT + 'essen/meat-cooked', n: 'Fleisch', c: E, size: 0.25, e: 18 },
+  pistol:           { f: IT + 'waffen/pistol', n: 'Pistole', c: W, size: 0.22, pick: true, hold: 'palm', gun: true, p: 250 },
+  munition:         { f: 'items/extra/can', n: 'Munition', c: W, size: 0.08, pick: true, stack: true, hold: 'palm', p: 2, msg: 'Patronen für die Pistole.' },
+  verband:          { f: 'survival/box', n: 'Verbandskasten', s: 'Verbands­kasten', c: T, size: 0.28, pick: true, stack: true, hold: 'palm', use: true, p: 25 },
   verkaufsstand:    { f: 'survival/resource-planks', n: 'Verkaufsstand', s: 'Verkaufs­stand', c: T, size: 0.8, pick: true, hold: 'palm', place: true, p: 30 },
   chest_wood:       { f: IT + 'schaetze/chest_wood', n: 'Truhe', c: D, size: 0.9 },
   chest_open:       { f: IT + 'schaetze/chest_ingots', n: 'Offene Truhe', c: D, size: 0.85 },
@@ -643,6 +646,14 @@ export class ItemManager {
       return;
     }
     const def = CATALOG[s.key];
+    if (def.gun) { this.onShoot?.(s.key); return; }   // Pistole: schiessen (life.js)
+    if (def.use) {     // z. B. Verbandskasten
+      if (this.onUseItem?.(s.key)) {
+        s.n -= 1; if (s.n <= 0) this.slots[this.selected] = null;
+        this._refreshHeld(); this._renderUi(); this._save();
+      }
+      return;
+    }
     if (def.place) {   // z. B. Verkaufsstand aufstellen
       if (this.onPlace?.(s.key)) {
         s.n -= 1; if (s.n <= 0) this.slots[this.selected] = null;
@@ -678,6 +689,7 @@ export class ItemManager {
     s.n -= 1;
     if (s.n <= 0) this.slots[act.slot] = null;
     this.energy = Math.min(100, this.energy + (def.e ?? 5));
+    this.onConsume?.(act.key, def);
     this._say(def.msg ?? (def.drink ? `Ah, erfrischend – ${def.n}!` : `Mmh, ${def.n}!`));
     this._refreshHeld();
     this._renderUi();

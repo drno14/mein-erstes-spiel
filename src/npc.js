@@ -139,6 +139,25 @@ class Npc {
     this.play('rennen', 0.15);
   }
 
+  /** Zu (x, z) laufen/rennen, Hindernissen seitlich ausweichen. Gibt die Restdistanz zurück. */
+  moveTo(x, z, speed, dt, blocked, stopAt = 0.6) {
+    const p = this.root.position;
+    const dx = x - p.x, dz = z - p.z, dist = Math.hypot(dx, dz);
+    if (dist < stopAt) { this.play('stehen', 0.2); return dist; }
+    this.play(speed > 2.2 ? 'rennen' : 'laufen', 0.2);
+    this.turnTo(Math.atan2(dx, dz), dt, 8);
+    const step = Math.min(speed * dt, dist);
+    for (const da of [0, 0.7, -0.7, 1.4, -1.4, 2.1, -2.1]) {
+      const a = this.root.rotation.y + da * (this.avoidSide ?? 1);
+      const ax = p.x + Math.sin(a) * step, az = p.z + Math.cos(a) * step;
+      if (!blocked(ax, az) && this.terrain.height(ax, az) > SEA_LEVEL + 0.1) {
+        p.x = ax; p.z = az; if (da) this.root.rotation.y = a; return dist;
+      }
+    }
+    this.avoidSide = -(this.avoidSide ?? 1);
+    return dist;
+  }
+
   say(text, sec = 3) { this.shout = text; this.shoutT = sec; }
 
   knockOut() {
@@ -161,6 +180,14 @@ class Npc {
         this.state = 'idle'; this.timer = 1; this.shout = 'Uff … mein Kopf.'; this.shoutT = 3;
       }
       if (toPlayer < ACTIVE_DIST) { this.mixer.update(dt); if (Npc.getPoseSettings) this.applyPose(Npc.getPoseSettings()); }
+      return;
+    }
+    if (this.brain) {   // ferngesteuert (Polizei, Feuerwehr …)
+      if (this.shoutT > 0 && (this.shoutT -= dt) <= 0) this.shout = '';
+      this.brain(this, dt, playerPos, blocked);
+      p.y = this.terrain.height(p.x, p.z);
+      this.mixer.update(dt);
+      if (Npc.getPoseSettings) this.applyPose(Npc.getPoseSettings());
       return;
     }
     if (toPlayer > ACTIVE_DIST) { this.label.style.display = 'none'; return; }
@@ -328,6 +355,24 @@ export class NpcManager {
       npc.update(dt, playerPos, this.blocked);
       npc.updateLabel(camera, playerPos, w, h);
     }
+  }
+
+  /** Sonderfigur (Polizist, Feuerwehrmann …): eigene Kleiderfarbe, Name, Steuerung über npc.brain. */
+  spawnSpecial(x, z, { tint = 0x2a4a9a, name = 'Polizist', female = false } = {}) {
+    const template = this.templates.find((t) => t.female === female) ?? this.templates[0];
+    const npc = new Npc(template, { x, z }, Math.random, this.terrain);
+    for (const m of npc.ownMaterials) if (m.name.startsWith('Kleidung')) m.color.setHex(tint);
+    npc.name = name;
+    npc.label.querySelector('b').textContent = name;
+    npc.special = true;
+    this.scene.add(npc.root);
+    this.all.push(npc);
+    return npc;
+  }
+
+  removeSpecial(npc) {
+    npc.dispose(this.scene);
+    this.all = this.all.filter((n) => n !== npc);
   }
 
   /** Treffbare NPCs für das Kampfsystem (combat.js). */

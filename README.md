@@ -15,6 +15,8 @@ Eine prozedural erzeugte, moderne 3D-Open-World im Browser (Siedlungen mit Stras
 | F · 1–9 / Q · R · G | aufheben · Fach wählen · benutzen/schlagen · ablegen |
 | C | Herstellen (Crafting) |
 | H | Handeln am Marktstand / eigener Verkaufsstand |
+| H (an der Tür) | Spital (Behandlung) · Polizei (stellen) · Bank (Konto, Überfall) · Feuerwehr |
+| R mit Pistole | schiessen (braucht Munition, Händler) · Fackel zündet Holz/Büsche an |
 | N · T | Wetter wechseln · +2 Stunden |
 | K | Skelett-Ansicht |
 
