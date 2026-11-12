@@ -9,3 +9,6 @@ Alle Modelle in diesem Ordner sind CC0 (Public Domain), frei nutzbar ohne Namens
 - items/waffen/    Quaternius – Ultimate RPG Items Pack, Fantasy Props MEGAKIT
 - items/werkzeuge/ Quaternius – Fantasy Props MEGAKIT
 - items/schaetze/  Quaternius – Ultimate RPG Items Pack, Fantasy Props MEGAKIT
+- items/extra/      Kenney – Food Kit (kenney.nl; Dateien ohne Präfix, Textur Textures/colormap.png),
+                   Quaternius – Ultimate RPG Items Pack (rpg_*), Quaternius – Fantasy Props MEGAKIT (mk_*);
+                   Flüssigkeits-/Glasfarben der rpg_potion*-Modelle nachträglich gesetzt

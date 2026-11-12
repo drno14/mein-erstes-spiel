@@ -126,13 +126,17 @@ class Npc {
   /** Getroffen → schreien und vom Spieler wegrennen. */
   hurt(fromX, fromZ) {
     if (this.ko) return;
-    this.shout = pick(OUCH, Math.random);
+    if (this.errand) { this.errand.cancel?.(this); this.errand = null; }
+    this.shout = pick(OUCH, Math.random); this.shoutT = 0;
     this.fleeFrom = { x: fromX, z: fromZ };
     this.state = 'flee'; this.timer = 4 + Math.random() * 2;
     this.play('rennen', 0.15);
   }
 
+  say(text, sec = 3) { this.shout = text; this.shoutT = sec; }
+
   knockOut() {
+    if (this.errand) { this.errand.cancel?.(this); this.errand = null; }
     this.ko = true; this.koT = 0; this.hp = 0;
     this.state = 'ko'; this.shout = '';
     this.play('stehen', 0.2);
@@ -166,7 +170,7 @@ class Npc {
       if (blocked(nx, nz) || hNew < SEA_LEVEL + 0.2) this.root.rotation.y += (Math.random() < 0.5 ? -1 : 1) * 1.2;
       else { p.x = nx; p.z = nz; }
       if (this.timer <= 0) { this.state = 'idle'; this.timer = 1 + this.rand() * 2; this.play('stehen'); this.shout = ''; }
-    } else if (toPlayer < GREET_DIST) {
+    } else if (toPlayer < GREET_DIST && !this.errand) {
       // Stehen bleiben und zum Spieler drehen
       this.state = 'talk';
       this.play('stehen');
@@ -175,6 +179,11 @@ class Npc {
       this.state = 'idle'; this.timer = 1 + this.rand() * 2;
     }
 
+    if (this.errand) {   // Besorgung (z. B. am Verkaufsstand des Spielers einkaufen)
+      this.errand.t = (this.errand.t ?? 0) + dt;
+      if (this.errand.t > 35) { this.errand.cancel?.(this); this.errand = null; }
+      else if (this.state === 'idle' || this.state === 'talk') { this.target = { x: this.errand.x, z: this.errand.z }; this.state = 'walk'; this.play('laufen'); }
+    }
     if (this.state === 'idle') {
       this.timer -= dt;
       if (this.timer <= 0) {
@@ -186,6 +195,10 @@ class Npc {
       const dist = Math.hypot(dx, dz);
       if (dist < 0.5) {
         this.state = 'idle'; this.timer = 2 + this.rand() * 5; this.play('stehen');
+        if (this.errand && Math.hypot(this.errand.x - p.x, this.errand.z - p.z) < 0.8) {
+          const e = this.errand; this.errand = null; e.arrive(this);
+          if (e.face) this.root.rotation.y = Math.atan2(e.face.x - p.x, e.face.z - p.z);
+        }
       } else {
         this.turnTo(Math.atan2(dx, dz), dt, 5);
         const step = Math.min(NPC_SPEED * dt, dist);
@@ -194,7 +207,19 @@ class Npc {
         const hNow = this.terrain.height(p.x, p.z), hNew = this.terrain.height(nx, nz);
         const tooSteep = (hNew - hNow) / (step || 1e-6) > 0.9;
         if (blocked(nx, nz) || tooSteep || hNew < SEA_LEVEL + 0.2) {
-          this.state = 'idle'; this.timer = 0.5 + this.rand(); this.play('stehen');   // neues Ziel suchen
+          // mit Besorgung: seitlich ausweichen statt aufgeben
+          let moved = false;
+          if (this.errand) {
+            for (const da of [0.7, -0.7, 1.4, -1.4, 2.1, -2.1]) {
+              const a = this.root.rotation.y + da * (this.avoidSide ?? 1);
+              const ax = p.x + Math.sin(a) * step, az = p.z + Math.cos(a) * step;
+              if (!blocked(ax, az) && this.terrain.height(ax, az) > SEA_LEVEL + 0.2) {
+                p.x = ax; p.z = az; this.root.rotation.y = a; moved = true; break;
+              }
+            }
+            if (!moved) this.avoidSide = -(this.avoidSide ?? 1);
+          }
+          if (!moved) { this.state = 'idle'; this.timer = 0.5 + this.rand(); this.play('stehen'); }   // neues Ziel suchen
         } else {
           p.x = nx; p.z = nz;
         }

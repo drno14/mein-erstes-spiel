@@ -1,6 +1,7 @@
 import * as THREE from 'three/webgpu';
 import { mulberry32, hash2 } from './world/noise.js';
 import { CHUNK_SIZE, SEA_LEVEL } from './world/terrain.js';
+import { EXTRA, EXTRA_SPAWN } from './catalogExtra.js';
 
 /*
  * Gegenstände: Waffen, Werkzeuge, Essen, Schätze – liegen in der Welt, lassen sich aufheben,
@@ -134,9 +135,12 @@ const CATALOG = {
   planken:          { f: 'survival/resource-planks', n: 'Bretter', c: R, size: 1.0, pick: true, stack: true, hold: 'palm', msg: 'Damit liesse sich etwas bauen.' },
   stein:            { f: 'survival/resource-stone', n: 'Stein', c: R, size: 0.4, pick: true, stack: true, hold: 'palm', msg: 'Ein schwerer Stein.' },
   rohfleisch:       { f: IT + 'essen/meat-cooked', n: 'Fleisch', c: E, size: 0.25, e: 18 },
+  verkaufsstand:    { f: 'survival/resource-planks', n: 'Verkaufsstand', s: 'Verkaufs­stand', c: T, size: 0.8, pick: true, hold: 'palm', place: true, p: 30 },
   chest_wood:       { f: IT + 'schaetze/chest_wood', n: 'Truhe', c: D, size: 0.9 },
   chest_open:       { f: IT + 'schaetze/chest_ingots', n: 'Offene Truhe', c: D, size: 0.85 },
 };
+// ~165 weitere Gegenstände (catalogExtra.js)
+for (const [k, d] of Object.entries(EXTRA)) if (!CATALOG[k]) CATALOG[k] = d;
 // Essen und Getränke: immer aufhebbar, stapelbar, liegen in der Handfläche
 for (const def of Object.values(CATALOG)) {
   if (def.c === E) { def.pick = true; def.stack = true; def.hold = 'palm'; }
@@ -151,6 +155,13 @@ const VILLAGE_TOOLS = ['pickaxe_bronze', 'tool_hammer', 'tool_shovel', 'tool_hoe
 const STAND_WEAPONS = ['sword', 'sword', 'axe_small', 'bow_wooden', 'sword_bronze', 'axe_double', 'dagger', 'hammer_double', 'axe_bronze', 'sword_big', 'shield_wooden'];
 const TREASURE = ['coin_pile', 'coin_pile', 'potion_red', 'potion_blue', 'potion_green', 'potion_purple', 'gold_ingots', 'crystal', 'necklace', 'ring', 'key1', 'scroll', 'book', 'dagger_golden', 'sword_golden'];
 const RARE_TREASURE = ['crown', 'sword_big_golden', 'bow_golden'];
+// zusätzliche Gegenstände in die Spawn-Listen
+MARKET_FOOD.push(...EXTRA_SPAWN.market, ...(EXTRA_SPAWN.snack ?? []));
+CAMP_FOOD.push(...EXTRA_SPAWN.camp.filter((k) => EXTRA[k]?.c === E));
+CAMP_TOOLS.push(...EXTRA_SPAWN.camp.filter((k) => EXTRA[k]?.c !== E));
+VILLAGE_TOOLS.push(...EXTRA_SPAWN.village);
+TREASURE.push(...EXTRA_SPAWN.treasure);
+RARE_TREASURE.push(...(EXTRA_SPAWN.rare ?? []));
 
 /*
  * ---------- Griff an der Hand ----------
@@ -226,6 +237,30 @@ function keyed(times, vals, t) {
  * Pose-Zusätze zu den Editor-Einstellungen addieren (wie withRidePose in main.js).
  * out wird wiederverwendet → keine Allokation pro Bild. Ohne Zusätze kommt settings zurück.
  */
+// ---------- Preise (Münzen) für Handel und Verkaufsstand ----------
+const PRICE = {
+  holz: 2, planken: 3, stein: 2, rohfleisch: 4, coin: 1, coin_pile: 5, gold_ingots: 60, crown: 150, crystal: 35,
+  necklace: 45, ring: 30, key1: 8, key_gold: 25, scroll: 15, book: 12, potion_red: 15, potion_blue: 18, potion_green: 22,
+  potion_purple: 18, sword_golden: 90, sword_big_golden: 140, dagger_golden: 60, bow_golden: 110, sword_big: 45,
+  hammer_double: 40, axe_double: 35, rope_1: 6, bucket_wooden_1: 8, torch_metal: 6, arrow: 1, dart: 2,
+};
+const CAT_PRICE = { Waffe: 25, Werkzeug: 14, Schatz: 20, Rohstoff: 2, Deko: 0 };
+/** Kaufpreis eines Gegenstands in Münzen (Verkauf an Händler: die Hälfte). */
+export function priceOf(key) {
+  const def = CATALOG[key];
+  if (!def) return 0;
+  if (def.p) return def.p;
+  if (PRICE[key]) return PRICE[key];
+  if (def.c === E) return Math.max(1, Math.round((def.e ?? 10) / 5));
+  return CAT_PRICE[def.c] ?? 5;
+}
+/** Alle Gegenstände, die man aufheben (und damit kaufen/verkaufen) kann. */
+export function tradableKeys() {
+  return Object.keys(CATALOG).filter((k) => CATALOG[k].pick && k !== 'coin' && k !== 'coin_pile');
+}
+export function categoryOf(key) { return CATALOG[key]?.c; }
+export { CAT_COLOR };
+
 export function addPoseOffsets(settings, offsets, out = { values: {} }) {
   if (!offsets || !settings) return settings;
   out.version = settings.version; out.symmetric = settings.symmetric;
@@ -608,6 +643,13 @@ export class ItemManager {
       return;
     }
     const def = CATALOG[s.key];
+    if (def.place) {   // z. B. Verkaufsstand aufstellen
+      if (this.onPlace?.(s.key)) {
+        s.n -= 1; if (s.n <= 0) this.slots[this.selected] = null;
+        this._refreshHeld(); this._renderUi(); this._save();
+      }
+      return;
+    }
     if (def.c === E || def.drink) {
       this.act = { kind: 'eat', t: 0, dur: ACTIONS.eat.dur, slot: this.selected, key: s.key };
     } else if (def.hold === 'bow' || def.hold === 'shield') {

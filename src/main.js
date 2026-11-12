@@ -14,6 +14,7 @@ import { DecorManager } from './world/decor.js';
 import { ItemManager, addPoseOffsets } from './items.js';
 import { Combat } from './combat.js';
 import { Crafting } from './crafting.js';
+import { Business } from './business.js';
 
 // ---------- Einstellungen ----------
 const WALK_SPEED = 1.7;      // Gehen mit W (m/s)
@@ -356,7 +357,7 @@ const hint = document.getElementById('hint');
 canvas.addEventListener('click', () => canvas.requestPointerLock?.());
 document.addEventListener('pointerlockchange', () => {
   hint.textContent = document.pointerLockElement === canvas
-    ? 'W gehen · Shift sprinten · Leertaste springen · E einsteigen · F aufheben · 1–9/Q Fach · R benutzen · G ablegen · C herstellen · N Wetter · T Uhrzeit · K Skelett · Esc'
+    ? 'W gehen · Shift sprinten · Leertaste springen · E einsteigen · F aufheben · 1–9/Q Fach · R benutzen · G ablegen · C herstellen · H handeln · N Wetter · T Uhrzeit · K Skelett · Esc'
     : 'Ins Bild klicken, um mit der Maus zu steuern';
 });
 let dragging = false;
@@ -502,6 +503,7 @@ function updateWorld(dt, p, now) {
   items.update(dt, p, yaw);
   combat.update(dt);
   crafting.update();
+  business.update(dt, camera);
   for (const u of worldUpdaters) u(dt, p, situations.night);
   const prompt = vehicles.prompt || items.prompt;
   if (prompt !== lastPrompt) { lastPrompt = prompt; promptEl.textContent = prompt; promptEl.style.display = prompt ? 'block' : 'none'; }
@@ -523,7 +525,14 @@ chunks.radius = VIEW_RADIUS;
 chunks.buildPerFrame = 2;
 npcs.spawnStartVillage();
 loadingEl.textContent = 'Lade Fahrzeuge, Tiere und Gegenstände …';
+// ---------- Handel & Business (H): Händler an Marktständen, eigener Verkaufsstand ----------
+const business = new Business({
+  scene, items, player, terrain, loader, npcs, getYaw: () => yaw,
+  shopsNear: (x, z, d) => [...decor.targetsNear(x, z)].some((t) => !t.dead && t.name === 'Marktstand' && Math.hypot(t.x - x, t.z - z) < d),
+});
+extraObstacleSources.push((x, z) => business.obstacles(x, z));
 await Promise.all([vehicles.init(), animals.init(), decor.init(), items.init()]);
+await business.init();
 statsSources.push(() => ` · ${items.count} Gegenstände`);
 statsSources.push(() => ` · ${animals.count} Tiere`);
 const startMs = performance.now() - t0;
@@ -563,7 +572,7 @@ addEventListener('resize', () => {
 function statsExtra() { return statsSources.map((f) => f()).join(''); }
 
 // Für Tests im Browser
-window.__game = { crafting,
+window.__game = { crafting, business,
   player, terrain, chunks, npcs, isWebGPU, anim, camera, SEED, skeletonView, situations, vehicles, animals, decor, items, combat, dorfTargets,
   get drive() { return drive; },
   get poseSettings() { return poseSettings; },

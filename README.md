@@ -14,6 +14,7 @@ Eine prozedural erzeugte 3D-Open-World im Browser – gebaut mit [three.js](http
 | E | Fahrzeug / Pferd ein- und aussteigen (W/S, A/D) |
 | F · 1–9 / Q · R · G | aufheben · Fach wählen · benutzen/schlagen · ablegen |
 | C | Herstellen (Crafting) |
+| H | Handeln am Marktstand / eigener Verkaufsstand |
 | N · T | Wetter wechseln · +2 Stunden |
 | K | Skelett-Ansicht |
 

@@ -14,6 +14,7 @@ const RECIPES = [
   { out: 'tool_hammer', n: 1, in: [['holz', 1], ['stein', 2]] },
   { out: 'tool_hoe', n: 1, in: [['holz', 2], ['stein', 1]] },
   { out: 'arrow', n: 5, in: [['holz', 1], ['stein', 1]] },
+  { out: 'verkaufsstand', n: 1, in: [['planken', 4], ['holz', 2]] },
   { out: 'bucket_wooden_1', n: 1, in: [['planken', 3]] },
   { out: 'shield_wooden', n: 1, in: [['planken', 4]] },
   { out: 'bow_wooden', n: 1, in: [['holz', 3], ['rope_1', 1]] },
