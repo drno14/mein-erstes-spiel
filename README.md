@@ -12,7 +12,8 @@ Eine prozedural erzeugte 3D-Open-World im Browser – gebaut mit [three.js](http
 | W / Shift+W | gehen / sprinten |
 | Leertaste | springen |
 | E | Fahrzeug / Pferd ein- und aussteigen (W/S, A/D) |
-| F · 1–9 / Q · R · G | aufheben · Fach wählen · benutzen · ablegen |
+| F · 1–9 / Q · R · G | aufheben · Fach wählen · benutzen/schlagen · ablegen |
+| C | Herstellen (Crafting) |
 | N · T | Wetter wechseln · +2 Stunden |
 | K | Skelett-Ansicht |
 

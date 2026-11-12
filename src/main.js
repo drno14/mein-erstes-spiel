@@ -13,6 +13,7 @@ import { AnimalManager } from './animals.js';
 import { DecorManager } from './world/decor.js';
 import { ItemManager, addPoseOffsets } from './items.js';
 import { Combat } from './combat.js';
+import { Crafting } from './crafting.js';
 
 // ---------- Einstellungen ----------
 const WALK_SPEED = 1.7;      // Gehen mit W (m/s)
@@ -262,6 +263,21 @@ combat.addSource((x, z) => chunks.targetsNear(x, z));      // Bäume, Büsche, F
 combat.addSource((x, z) => decor.targetsNear(x, z));       // Kisten, Fässer, Karren, Stände …
 combat.addSource((x, z) => items.targetsNear(x, z));       // Waffenständer, Obstkisten, Truhen
 combat.addSource((x, z) => animals.targetsNear(x, z));     // Tiere
+combat.addSource((x, z) => npcs.targetsNear(x, z));        // andere Figuren (werden k.o. geschlagen)
+const crafting = new Crafting({
+  items, player,
+  onOpen: () => document.exitPointerLock?.(),
+  stations: (x, z, d) => {
+    const st = [], near = (t) => Math.hypot(t.x - x, t.z - z) < d;
+    if (decor.campfires.some(near)) st.push('feuer');
+    for (const t of [...decor.targetsNear(x, z), ...items.targetsNear(x, z)]) {
+      if (t.dead || !near(t)) continue;
+      if (t.name === 'Amboss') st.push('amboss');
+      if (t.name === 'Werkbank') st.push('werkbank');
+    }
+    return st;
+  },
+});
 combat.addSource((x, z) => dorfTargets.filter((t) => !t.dead && Math.hypot(t.x - x, t.z - z) < 7));   // Startdorf
 
 // Reithaltung: wird beim Reiten zu den Editor-Einstellungen addiert
@@ -340,7 +356,7 @@ const hint = document.getElementById('hint');
 canvas.addEventListener('click', () => canvas.requestPointerLock?.());
 document.addEventListener('pointerlockchange', () => {
   hint.textContent = document.pointerLockElement === canvas
-    ? 'W gehen · Shift sprinten · Leertaste springen · E einsteigen · F aufheben · 1–9/Q Fach · R benutzen · G ablegen · N Wetter · T Uhrzeit · K Skelett · Esc'
+    ? 'W gehen · Shift sprinten · Leertaste springen · E einsteigen · F aufheben · 1–9/Q Fach · R benutzen · G ablegen · C herstellen · N Wetter · T Uhrzeit · K Skelett · Esc'
     : 'Ins Bild klicken, um mit der Maus zu steuern';
 });
 let dragging = false;
@@ -485,6 +501,7 @@ function updateWorld(dt, p, now) {
   decor.update(dt, p, situations.night);
   items.update(dt, p, yaw);
   combat.update(dt);
+  crafting.update();
   for (const u of worldUpdaters) u(dt, p, situations.night);
   const prompt = vehicles.prompt || items.prompt;
   if (prompt !== lastPrompt) { lastPrompt = prompt; promptEl.textContent = prompt; promptEl.style.display = prompt ? 'block' : 'none'; }
@@ -546,7 +563,7 @@ addEventListener('resize', () => {
 function statsExtra() { return statsSources.map((f) => f()).join(''); }
 
 // Für Tests im Browser
-window.__game = {
+window.__game = { crafting,
   player, terrain, chunks, npcs, isWebGPU, anim, camera, SEED, skeletonView, situations, vehicles, animals, decor, items, combat, dorfTargets,
   get drive() { return drive; },
   get poseSettings() { return poseSettings; },

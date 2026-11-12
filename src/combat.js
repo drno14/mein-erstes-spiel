@@ -23,20 +23,20 @@ const TOOL_NAME = { axt: 'Axt', spitzhacke: 'Spitzhacke', hammer: 'Hammer', scha
 
 // Schaden pro Schlag: Werkzeug × Material
 const DAMAGE = {
-  //            holz pflanze stein metall tier stoff
-  hand:       { holz: 4,  pflanze: 7,  stein: 1,  metall: 1,  tier: 5,  stoff: 6 },
-  axt:        { holz: 34, pflanze: 24, stein: 3,  metall: 3,  tier: 20, stoff: 22 },
-  spitzhacke: { holz: 9,  pflanze: 8,  stein: 34, metall: 20, tier: 12, stoff: 8 },
-  hammer:     { holz: 22, pflanze: 8,  stein: 18, metall: 16, tier: 14, stoff: 8 },
-  schaufel:   { holz: 8,  pflanze: 32, stein: 10, metall: 2,  tier: 8,  stoff: 10 },
-  hacke:      { holz: 10, pflanze: 28, stein: 8,  metall: 2,  tier: 8,  stoff: 10 },
-  klinge:     { holz: 7,  pflanze: 20, stein: 2,  metall: 2,  tier: 30, stoff: 30 },
-  fackel:     { holz: 18, pflanze: 34, stein: 1,  metall: 1,  tier: 8,  stoff: 34 },
+  //            holz pflanze stein metall tier stoff mensch
+  hand:       { holz: 4,  pflanze: 7,  stein: 1,  metall: 1,  tier: 5,  stoff: 6, mensch: 8 },
+  axt:        { holz: 34, pflanze: 24, stein: 3,  metall: 3,  tier: 20, stoff: 22, mensch: 22 },
+  spitzhacke: { holz: 9,  pflanze: 8,  stein: 34, metall: 20, tier: 12, stoff: 8, mensch: 14 },
+  hammer:     { holz: 22, pflanze: 8,  stein: 18, metall: 16, tier: 14, stoff: 8, mensch: 18 },
+  schaufel:   { holz: 8,  pflanze: 32, stein: 10, metall: 2,  tier: 8,  stoff: 10, mensch: 10 },
+  hacke:      { holz: 10, pflanze: 28, stein: 8,  metall: 2,  tier: 8,  stoff: 10, mensch: 10 },
+  klinge:     { holz: 7,  pflanze: 20, stein: 2,  metall: 2,  tier: 30, stoff: 30, mensch: 28 },
+  fackel:     { holz: 18, pflanze: 34, stein: 1,  metall: 1,  tier: 8,  stoff: 34, mensch: 12 },
 };
 // Bestes Werkzeug je Material (für Hinweise)
-const BEST = { holz: 'eine Axt', pflanze: 'eine Schaufel oder Axt', stein: 'eine Spitzhacke', metall: 'eine Spitzhacke oder einen Hammer', tier: 'eine Klinge', stoff: 'eine Klinge' };
+const BEST = { holz: 'eine Axt', pflanze: 'eine Schaufel oder Axt', stein: 'eine Spitzhacke', metall: 'eine Spitzhacke oder einen Hammer', tier: 'eine Klinge', stoff: 'eine Klinge', mensch: 'eine Klinge' };
 // Farbe der Splitter je Material
-const CHIP = { holz: 0x8a5a2b, pflanze: 0x4f9a3a, stein: 0x8c8a84, metall: 0xb8bcc4, tier: 0xf1f1f1, stoff: 0xd9c9a6 };
+const CHIP = { holz: 0x8a5a2b, pflanze: 0x4f9a3a, stein: 0x8c8a84, metall: 0xb8bcc4, tier: 0xf1f1f1, stoff: 0xd9c9a6, mensch: 0xc94a3a };
 
 const REACH = 1.7;          // m vom Körperrand zur Figur
 const HIT_DELAY = 0.16;     // s nach Beginn des Schwungs (Ausholen)
@@ -124,7 +124,7 @@ export class Combat {
         this.items.spawnDrop(key, n, t.x + Math.cos(a) * 0.7, t.z + Math.sin(a) * 0.7);
       }
       const what = drops.length ? ` – ${drops.map(([key, n]) => `${n}× ${this.items.nameOf?.(key) ?? key}`).join(', ')}` : '';
-      this.items.say(`${t.name} ${t.material === 'tier' ? 'erlegt' : 'zerstört'}${what}`, 2.5);
+      this.items.say(`${t.name} ${t.doneVerb ?? (t.material === 'tier' ? 'erlegt' : 'zerstört')}${what}`, 2.5);
       this.bar = null;
     } else if (base <= 5 && tool !== 'hand') {
       this.items.say(`Mit ${TOOL_NAME[tool] === 'Faust' ? 'der Faust' : `dieser ${TOOL_NAME[tool]}`} geht das kaum – nimm ${BEST[t.material]}!`, 2.5);

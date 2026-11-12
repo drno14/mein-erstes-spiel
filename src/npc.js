@@ -10,6 +10,9 @@ const WANDER_RADIUS = 13;       // so weit entfernen sie sich von ihrem Zuhause
 const GREET_DIST = 4;           // ab hier bleiben sie stehen und reden
 const NAME_DIST = 14;           // ab hier sieht man den Namen
 const ACTIVE_DIST = 110;        // weiter weg: keine Animation (spart Leistung)
+const NPC_HP = 60;              // Lebenspunkte (Treffer mit Waffen, siehe combat.js)
+const FLEE_SPEED = 3.6;         // wegrennen nach einem Treffer
+const KO_TIME = 14;             // so lange bleibt ein k.o. geschlagener NPC liegen
 
 const NAMES_M = ['Ben', 'David', 'Finn', 'Hugo', 'Jonas', 'Max', 'Paul', 'Tom', 'Luca', 'Emil', 'Oskar', 'Theo', 'Nico', 'Elias', 'Levin', 'Samuel'];
 const NAMES_F = ['Anna', 'Clara', 'Elif', 'Greta', 'Ida', 'Lea', 'Mia', 'Rosa', 'Yara', 'Nina', 'Lina', 'Zoe', 'Sara', 'Lara', 'Julia', 'Emma'];
@@ -35,6 +38,7 @@ const PALETTE = {
   Haare: [0xffffff, 0x6a4a35, 0x3a2a1e, 0xe8c890, 0xa0a0a0, 0x8a4a2a],
   Schuhe: [0xffffff, 0x8a6a50, 0x505050, 0xc0a080],
 };
+const OUCH = ['Aua!', 'Hey, lass das!', 'Hilfe!', 'Spinnst du?!', 'Aufhören!'];
 const pick = (arr, r) => arr[Math.floor(r() * arr.length)];
 
 class Npc {
@@ -82,6 +86,9 @@ class Npc {
       stehen: this.mixer.clipAction(clips.stehen),
       laufen: this.mixer.clipAction(clips.laufen),
     };
+    if (clips.rennen) { this.actions.rennen = this.mixer.clipAction(clips.rennen); this.actions.rennen.timeScale = FLEE_SPEED / 3.68; }
+    else this.actions.rennen = this.actions.laufen;
+    this.hp = NPC_HP; this.ko = false; this.koT = 0; this.shout = '';
     this.actions.laufen.timeScale = NPC_SPEED / 1.33;  // 1.33 m/s = natürliches Tempo der Geh-Animation (Mocap)
     this.actions.stehen.time = rand() * 2;  // nicht alle atmen im Gleichtakt
     this.current = this.actions.stehen;
@@ -116,12 +123,50 @@ class Npc {
     return null;
   }
 
+  /** Getroffen → schreien und vom Spieler wegrennen. */
+  hurt(fromX, fromZ) {
+    if (this.ko) return;
+    this.shout = pick(OUCH, Math.random);
+    this.fleeFrom = { x: fromX, z: fromZ };
+    this.state = 'flee'; this.timer = 4 + Math.random() * 2;
+    this.play('rennen', 0.15);
+  }
+
+  knockOut() {
+    this.ko = true; this.koT = 0; this.hp = 0;
+    this.state = 'ko'; this.shout = '';
+    this.play('stehen', 0.2);
+  }
+
   update(dt, playerPos, blocked) {
     const p = this.root.position;
     const toPlayer = Math.hypot(playerPos.x - p.x, playerPos.z - p.z);
+    if (this.ko) {   // liegt am Boden, steht nach KO_TIME wieder auf
+      this.koT += dt;
+      const down = this.koT < KO_TIME - 1 ? Math.min(1, this.koT / 0.6) : Math.max(0, KO_TIME - this.koT);
+      this.model.rotation.x = -Math.PI / 2 * down * down;
+      this.root.position.y = this.terrain.height(p.x, p.z) + 0.12 * down;
+      if (this.koT >= KO_TIME) {
+        this.ko = false; this.hp = NPC_HP; this.model.rotation.x = 0;
+        this.state = 'idle'; this.timer = 1; this.shout = 'Uff … mein Kopf.'; this.shoutT = 3;
+      }
+      if (toPlayer < ACTIVE_DIST) { this.mixer.update(dt); if (Npc.getPoseSettings) this.applyPose(Npc.getPoseSettings()); }
+      return;
+    }
     if (toPlayer > ACTIVE_DIST) { this.label.style.display = 'none'; return; }
+    if (this.shoutT > 0 && (this.shoutT -= dt) <= 0) this.shout = '';
 
-    if (toPlayer < GREET_DIST) {
+    if (this.state === 'flee') {
+      this.timer -= dt;
+      const ax = p.x - this.fleeFrom.x, az = p.z - this.fleeFrom.z;
+      this.turnTo(Math.atan2(ax, az), dt, 8);
+      const step = FLEE_SPEED * dt;
+      const nx = p.x + Math.sin(this.root.rotation.y) * step, nz = p.z + Math.cos(this.root.rotation.y) * step;
+      const hNew = this.terrain.height(nx, nz);
+      if (blocked(nx, nz) || hNew < SEA_LEVEL + 0.2) this.root.rotation.y += (Math.random() < 0.5 ? -1 : 1) * 1.2;
+      else { p.x = nx; p.z = nz; }
+      if (this.timer <= 0) { this.state = 'idle'; this.timer = 1 + this.rand() * 2; this.play('stehen'); this.shout = ''; }
+    } else if (toPlayer < GREET_DIST) {
       // Stehen bleiben und zum Spieler drehen
       this.state = 'talk';
       this.play('stehen');
@@ -174,8 +219,8 @@ class Npc {
     if (v.z > 1) { this.label.style.display = 'none'; return; }   // hinter der Kamera
     this.label.style.display = 'block';
     this.label.style.transform = `translate(-50%, -100%) translate(${(v.x * 0.5 + 0.5) * width}px, ${(-v.y * 0.5 + 0.5) * height}px)`;
-    const talking = this.state === 'talk';
-    this.labelText.textContent = talking ? this.line : '';
+    const talking = this.state === 'talk' || !!this.shout;
+    this.labelText.textContent = this.shout || (talking ? this.line : '');
     this.label.classList.toggle('talking', talking);
     this.label.style.opacity = String(Math.min(1, (NAME_DIST - dist) / 4));
   }
@@ -199,7 +244,7 @@ export class NpcManager {
     Npc.getPoseSettings = getPoseSettings;
     const tpl = (gltf, foot, female) => {
       const find = (n) => THREE.AnimationClip.findByName(gltf.animations, n);
-      return { scene: gltf.scene, footOffset: foot, female, clips: { stehen: find('Stehen'), laufen: find('Laufen') } };
+      return { scene: gltf.scene, footOffset: foot, female, clips: { stehen: find('Stehen'), laufen: find('Laufen'), rennen: find('Rennen') } };
     };
     // Männer und (falls geladen) Frauen – beide mit demselben Skelett und denselben Bewegungen
     this.templates = [tpl(figurGltf, footOffset, false)];
@@ -254,9 +299,27 @@ export class NpcManager {
     }
   }
 
+  /** Treffbare NPCs für das Kampfsystem (combat.js). */
+  *targetsNear(x, z) {
+    for (const n of this.all) {
+      if (n.ko) continue;
+      const p = n.root.position;
+      if ((p.x - x) ** 2 + (p.z - z) ** 2 > 49) continue;
+      yield (n.hitTarget ??= {
+        npc: n, material: 'mensch', name: n.name, maxHp: NPC_HP, r: NPC_RADIUS, height: 1.75, doneVerb: 'ist k.o.',
+        get hp() { return n.hp; }, set hp(v) { n.hp = v; },
+        get dead() { return n.ko; },
+        get x() { return n.root.position.x; }, get z() { return n.root.position.z; }, get y() { return n.root.position.y; },
+        onHit(fx, fz) { if (n.hp > 0) n.hurt(fx, fz); },
+        destroy() { n.knockOut(); return [['coin', 1 + Math.floor(Math.random() * 3)]]; },
+      });
+    }
+  }
+
   /** Kollision Spieler ↔ NPC. */
   collides(x, z, radius) {
     for (const n of this.all) {
+      if (n.ko) continue;
       const p = n.root.position;
       if ((x - p.x) ** 2 + (z - p.z) ** 2 < (radius + NPC_RADIUS) ** 2) return true;
     }
